@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Transcriptor</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%234f46e5'/><path d='M9 12h14M9 16h10M9 20h12' stroke='white' stroke-width='2.5' stroke-linecap='round'/></svg>">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true"></span>
+      <span>Transcriptor</span>
+    </div>
+    <button id="logoutBtn" class="btn ghost small" hidden>Cerrar sesión</button>
+  </header>
+
+  <!-- Inicio de sesión (solo si el servidor tiene APP_PASSWORD) -->
+  <main id="loginView" class="login" hidden>
+    <form id="loginForm" class="card login-card">
+      <h1>Acceso</h1>
+      <p class="muted">Introduce la contraseña para usar el transcriptor.</p>
+      <input id="loginPassword" type="password" placeholder="Contraseña" autocomplete="current-password" required>
+      <p id="loginError" class="error" hidden></p>
+      <button class="btn primary" type="submit">Entrar</button>
+    </form>
+  </main>
+
+  <main id="appView" class="layout" hidden>
+    <aside class="sidebar">
+      <section class="card">
+        <label id="dropzone" class="dropzone" for="fileInput">
+          <input id="fileInput" type="file" multiple accept="video/*,audio/*,.mkv,.avi,.mov,.wmv,.flv,.webm,.m4a,.opus,.ogg,.amr,.aac,.flac,.wma,.3gp,.ts,.mts">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0-4 4m4-4 4 4M5 16v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <strong>Arrastra videos o audios aquí</strong>
+          <span class="muted">o haz clic · cualquier tamaño y duración</span>
+        </label>
+        <div class="options">
+          <label>Modelo
+            <select id="modelSelect"></select>
+          </label>
+          <label>Idioma
+            <select id="languageSelect"></select>
+          </label>
+          <p id="modelHint" class="model-hint muted"></p>
+        </div>
+        <ul id="uploadList" class="upload-list"></ul>
+      </section>
+
+      <section class="card jobs-card">
+        <div class="section-head">
+          <h2>Transcripciones</h2>
+          <span id="retentionNote" class="muted tiny"></span>
+        </div>
+        <ul id="jobList" class="job-list"></ul>
+        <p id="jobsEmpty" class="muted empty">Aún no hay transcripciones.</p>
+      </section>
+    </aside>
+
+    <section class="viewer card" id="viewer">
+      <div id="viewerEmpty" class="viewer-empty">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 10h10M4 14h16M4 18h8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <p>Sube un archivo o elige una transcripción de la lista para verla aquí.</p>
+        <ol class="steps">
+          <li><b>1</b> Arrastra un video o audio a la izquierda</li>
+          <li><b>2</b> Mira el texto aparecer mientras se transcribe</li>
+          <li><b>3</b> Copia o descarga en TXT, SRT o VTT</li>
+        </ol>
+      </div>
+
+      <div id="viewerContent" hidden>
+        <div class="viewer-head">
+          <div class="viewer-title">
+            <h1 id="vTitle"></h1>
+            <p id="vMeta" class="muted"></p>
+          </div>
+          <div class="viewer-actions">
+            <button id="copyBtn" class="btn small">Copiar texto</button>
+            <div class="dropdown">
+              <button id="downloadBtn" class="btn primary small" aria-haspopup="true" aria-expanded="false">Descargar ▾</button>
+              <div id="downloadMenu" class="dropdown-menu" hidden>
+                <a data-fmt="txt">Texto (.txt)</a>
+                <a data-fmt="tiempos.txt">Texto con tiempos (.txt)</a>
+                <a data-fmt="srt">Subtítulos (.srt)</a>
+                <a data-fmt="vtt">Subtítulos web (.vtt)</a>
+                <a data-fmt="json">Datos completos (.json)</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="vStatus" class="status-box" hidden>
+          <div class="status-line"><span id="vStage"></span><span id="vPercent"></span></div>
+          <div class="progress"><div id="vBar"></div></div>
+          <p id="vStatusNote" class="muted tiny"></p>
+        </div>
+        <p id="vError" class="error-box" hidden></p>
+
+        <div id="playerWrap" class="player"></div>
+
+        <div class="transcript-tools">
+          <input id="searchInput" type="search" placeholder="Buscar en la transcripción…">
+          <label class="toggle"><input id="followToggle" type="checkbox" checked> Seguir reproducción</label>
+        </div>
+        <ol id="transcript" class="transcript"></ol>
+        <p id="transcriptEmpty" class="muted empty" hidden></p>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+  <script src="app.js"></script>
+</body>
+</html>
