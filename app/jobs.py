@@ -73,6 +73,7 @@ class Job:
 
     def public(self) -> dict:
         d = dict(self.data)
+        d.pop("owner", None)
         d["segment_count"] = len(self.segments)
         return d
 
@@ -114,7 +115,8 @@ class JobManager:
 
     # ---------------------------------------------------------------- API
 
-    def create(self, upload_file: Path, filename: str, size: int, model: str, language: str | None) -> Job:
+    def create(self, upload_file: Path, filename: str, size: int, model: str, language: str | None,
+               owner: str) -> Job:
         job_id = uuid.uuid4().hex[:12]
         ext = Path(filename).suffix.lower()[:10]
         job_dir = config.JOBS_DIR / job_id
@@ -124,6 +126,7 @@ class JobManager:
 
         job = Job({
             "id": job_id,
+            "owner": owner,
             "filename": filename,
             "source_name": source_name,
             "size": size,
@@ -147,12 +150,14 @@ class JobManager:
         self.queue.put(job_id)
         return job
 
-    def get(self, job_id: str) -> Job | None:
-        return self.jobs.get(job_id)
+    def get(self, job_id: str, owner: str) -> Job | None:
+        """Solo devuelve el trabajo a quien lo creó."""
+        job = self.jobs.get(job_id)
+        return job if job and job.data.get("owner") == owner else None
 
-    def list(self) -> list[dict]:
+    def list(self, owner: str) -> list[dict]:
         with self.lock:
-            jobs = list(self.jobs.values())
+            jobs = [j for j in self.jobs.values() if j.data.get("owner") == owner]
         jobs.sort(key=lambda j: j.data["created_at"], reverse=True)
         return [j.public() for j in jobs]
 

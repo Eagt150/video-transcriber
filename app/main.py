@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import logging
 import mimetypes
+import secrets
 import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -65,12 +66,37 @@ def _authorized(request: Request) -> bool:
     return hmac.compare_digest(request.cookies.get(COOKIE, ""), _TOKEN)
 
 
+# Cada navegador recibe un identificador anónimo y solo ve sus propias
+# transcripciones. Se guarda un hash, no el token de la cookie.
+OWNER_COOKIE = "transcriptor_owner"
+OWNER_MAX_AGE = 60 * 60 * 24 * 400
+
+
+def _owner(request: Request) -> str:
+    return request.state.owner
+
+
+def _is_https(request: Request) -> bool:
+    return request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
+
+
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
     path = request.url.path
     if path.startswith("/api/") and path not in PUBLIC_PATHS and not _authorized(request):
         return JSONResponse({"detail": "No autorizado"}, status_code=401)
-    return await call_next(request)
+
+    token = request.cookies.get(OWNER_COOKIE, "")
+    new_token = None
+    if len(token) < 32:
+        token = new_token = secrets.token_urlsafe(32)
+    request.state.owner = hashlib.sha256(token.encode()).hexdigest()[:32]
+
+    response = await call_next(request)
+    if new_token:
+        response.set_cookie(OWNER_COOKIE, new_token, max_age=OWNER_MAX_AGE, httponly=True,
+                            samesite="lax", secure=_is_https(request))
+    return response
 
 
 class LoginBody(BaseModel):
@@ -87,7 +113,7 @@ async def login(body: LoginBody, request: Request):
     resp = JSONResponse({"ok": True})
     resp.set_cookie(
         COOKIE, _TOKEN, max_age=60 * 60 * 24 * 30, httponly=True, samesite="lax",
-        secure=request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https",
+        secure=_is_https(request),
     )
     return resp
 
@@ -135,17 +161,17 @@ class UploadInit(BaseModel):
 
 
 @app.post("/api/uploads")
-async def upload_create(body: UploadInit):
+async def upload_create(body: UploadInit, request: Request):
     try:
-        return uploads.create(body.filename, body.size)
+        return uploads.create(body.filename, body.size, _owner(request))
     except uploads.UploadError as e:
         return _upload_error(e)
 
 
 @app.get("/api/uploads/{upload_id}")
-async def upload_status(upload_id: str):
+async def upload_status(upload_id: str, request: Request):
     try:
-        m = uploads.meta(upload_id)
+        m = uploads.meta(upload_id, _owner(request))
         return {"received": m["received"], "size": m["size"], "chunk_size": config.CHUNK_SIZE}
     except uploads.UploadError as e:
         return _upload_error(e)
@@ -154,7 +180,7 @@ async def upload_status(upload_id: str):
 @app.put("/api/uploads/{upload_id}")
 async def upload_chunk(upload_id: str, offset: int, request: Request):
     try:
-        received = await uploads.write_chunk(upload_id, offset, request.stream())
+        received = await uploads.write_chunk(upload_id, _owner(request), offset, request.stream())
         return {"received": received}
     except uploads.UploadError as e:
         return _upload_error(e)
@@ -166,24 +192,24 @@ class UploadComplete(BaseModel):
 
 
 @app.post("/api/uploads/{upload_id}/complete")
-async def upload_complete(upload_id: str, body: UploadComplete):
+async def upload_complete(upload_id: str, body: UploadComplete, request: Request):
     if body.model not in config.ALLOWED_MODELS:
         raise HTTPException(400, "Modelo no permitido")
     if body.language not in LANGUAGES:
         raise HTTPException(400, "Idioma no soportado")
     try:
-        path, m = uploads.finish(upload_id)
+        path, m = uploads.finish(upload_id, _owner(request))
     except uploads.UploadError as e:
         return _upload_error(e)
     job = manager.create(path, m["filename"], m["size"], body.model,
-                         None if body.language == "auto" else body.language)
-    uploads.discard(upload_id)
+                         None if body.language == "auto" else body.language, _owner(request))
+    uploads.discard(upload_id, _owner(request))
     return job.public()
 
 
 @app.delete("/api/uploads/{upload_id}")
-async def upload_delete(upload_id: str):
-    uploads.discard(upload_id)
+async def upload_delete(upload_id: str, request: Request):
+    uploads.discard(upload_id, _owner(request))
     return {"ok": True}
 
 
@@ -191,21 +217,21 @@ async def upload_delete(upload_id: str):
 # Trabajos
 # --------------------------------------------------------------------------- #
 
-def _job_or_404(job_id: str):
-    job = manager.get(job_id)
+def _job_or_404(job_id: str, request: Request):
+    job = manager.get(job_id, _owner(request))
     if not job:
         raise HTTPException(404, "Trabajo no encontrado")
     return job
 
 
 @app.get("/api/jobs")
-async def jobs_list():
-    return manager.list()
+async def jobs_list(request: Request):
+    return manager.list(_owner(request))
 
 
 @app.get("/api/jobs/{job_id}")
-async def job_detail(job_id: str, since: int = 0):
-    job = _job_or_404(job_id)
+async def job_detail(job_id: str, request: Request, since: int = 0):
+    job = _job_or_404(job_id, request)
     data = job.public()
     data["queue_position"] = manager.queue_position(job_id)
     data["segments"] = job.segments[max(since, 0):]
@@ -214,22 +240,22 @@ async def job_detail(job_id: str, since: int = 0):
 
 
 @app.post("/api/jobs/{job_id}/cancel")
-async def job_cancel(job_id: str):
-    _job_or_404(job_id)
+async def job_cancel(job_id: str, request: Request):
+    _job_or_404(job_id, request)
     manager.cancel(job_id)
     return {"ok": True}
 
 
 @app.delete("/api/jobs/{job_id}")
-async def job_delete(job_id: str):
-    _job_or_404(job_id)
+async def job_delete(job_id: str, request: Request):
+    _job_or_404(job_id, request)
     manager.delete(job_id)
     return {"ok": True}
 
 
 @app.get("/api/jobs/{job_id}/media")
-async def job_media(job_id: str):
-    job = _job_or_404(job_id)
+async def job_media(job_id: str, request: Request):
+    job = _job_or_404(job_id, request)
     if not job.source.exists():
         raise HTTPException(404, "Archivo no disponible")
     media_type = mimetypes.guess_type(job.data["filename"])[0] or "application/octet-stream"
@@ -237,8 +263,8 @@ async def job_media(job_id: str):
 
 
 @app.get("/api/jobs/{job_id}/download/{fmt}")
-async def job_download(job_id: str, fmt: str):
-    job = _job_or_404(job_id)
+async def job_download(job_id: str, fmt: str, request: Request):
+    job = _job_or_404(job_id, request)
     stem = Path(job.data["filename"]).stem or "transcripcion"
     if fmt == "json":
         content, media_type = formats.to_json(job.public(), job.segments), "application/json"

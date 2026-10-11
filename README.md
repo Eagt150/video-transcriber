@@ -18,6 +18,8 @@ optimizado). Todo se procesa en el propio servidor: no se usan APIs de pago.
 - Búsqueda dentro de la transcripción.
 - Descargas en TXT, TXT con tiempos, SRT, VTT y JSON.
 - Cola de trabajos que sobrevive a reinicios del servidor.
+- Privado por navegador: cada persona solo ve sus transcripciones, sin cuentas
+  (una cookie anónima identifica al navegador).
 - Contraseña opcional para cuando esté publicada en internet.
 - Borrado automático de trabajos antiguos.
 

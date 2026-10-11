@@ -170,6 +170,7 @@ input:focus-visible, select:focus-visible, .btn:focus-visible, .dropzone:focus-w
 .job .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
 .job .name { font-weight: 550; font-size: .9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .job .sub { font-size: .78rem; color: var(--muted); }
+.privacy-note { margin: 10px 0 0; padding-top: 10px; border-top: 1px solid var(--border); }
 
 .badge {
   flex: none; font-size: .72rem; font-weight: 650; padding: 2px 8px; border-radius: 999px;

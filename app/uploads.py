@@ -39,14 +39,16 @@ def _dir(upload_id: str) -> Path:
     return d
 
 
-def meta(upload_id: str) -> dict:
+def meta(upload_id: str, owner: str) -> dict:
     d = _dir(upload_id)
     m = json.loads((d / "meta.json").read_text(encoding="utf-8"))
+    if m.get("owner") != owner:
+        raise UploadError(404, "Subida no encontrada")
     m["received"] = (d / "data").stat().st_size
     return m
 
 
-def create(filename: str, size: int) -> dict:
+def create(filename: str, size: int, owner: str) -> dict:
     filename = Path(filename).name.strip() or "archivo"
     if size <= 0:
         raise UploadError(400, "El archivo está vacío")
@@ -60,13 +62,13 @@ def create(filename: str, size: int) -> dict:
     d = config.UPLOADS_DIR / upload_id
     d.mkdir(parents=True)
     (d / "data").touch()
-    m = {"id": upload_id, "filename": filename, "size": size}
+    m = {"id": upload_id, "filename": filename, "size": size, "owner": owner}
     (d / "meta.json").write_text(json.dumps(m, ensure_ascii=False), encoding="utf-8")
-    return {**m, "received": 0, "chunk_size": config.CHUNK_SIZE}
+    return {"id": upload_id, "filename": filename, "size": size, "received": 0, "chunk_size": config.CHUNK_SIZE}
 
 
-async def write_chunk(upload_id: str, offset: int, stream) -> int:
-    m = meta(upload_id)
+async def write_chunk(upload_id: str, owner: str, offset: int, stream) -> int:
+    m = meta(upload_id, owner)
     data_path = _dir(upload_id) / "data"
     if offset != m["received"]:
         raise UploadError(409, "Posición incorrecta", received=m["received"])
@@ -90,16 +92,19 @@ async def write_chunk(upload_id: str, offset: int, stream) -> int:
     return offset + written
 
 
-def finish(upload_id: str) -> tuple[Path, dict]:
-    m = meta(upload_id)
+def finish(upload_id: str, owner: str) -> tuple[Path, dict]:
+    m = meta(upload_id, owner)
     if m["received"] != m["size"]:
         raise UploadError(409, "La subida no está completa", received=m["received"])
     d = _dir(upload_id)
     return d / "data", m
 
 
-def discard(upload_id: str) -> None:
+def discard(upload_id: str, owner: str) -> None:
     try:
-        shutil.rmtree(_dir(upload_id), ignore_errors=True)
-    except UploadError:
-        pass
+        d = _dir(upload_id)
+        m = json.loads((d / "meta.json").read_text(encoding="utf-8"))
+    except (UploadError, OSError, ValueError):
+        return
+    if m.get("owner") == owner:
+        shutil.rmtree(d, ignore_errors=True)
