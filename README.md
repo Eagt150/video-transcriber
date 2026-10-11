@@ -14,7 +14,7 @@ optimizado). Todo se procesa en el propio servidor: no se usan APIs de pago.
   cortadas en silencios para no partir palabras.
 - Detección automática del idioma.
 - Texto en vivo mientras se transcribe, con progreso y tiempo restante.
-- Visor con reproductor: al hacer clic en una frase el video salta a ese momento.
+- Visor con reproductor mientras se transcribe: al hacer clic en una frase el video salta a ese momento. Al terminar, el archivo original se borra para liberar espacio (el texto se conserva).
 - Búsqueda dentro de la transcripción.
 - Descargas en TXT, TXT con tiempos, SRT, VTT y JSON.
 - Cola de trabajos que sobrevive a reinicios del servidor.

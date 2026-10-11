@@ -2,7 +2,7 @@
 
 Cada trabajo vive en data/jobs/<id>/ con:
   job.json       estado y metadatos
-  source.<ext>   archivo original (para reproducirlo en el visor)
+  source.<ext>   archivo original (para reproducirlo en el visor; se borra al terminar)
   audio.wav      audio extraído, 16 kHz mono
   segments.json  segmentos transcritos
 """
@@ -62,6 +62,10 @@ class Job:
     def wav(self) -> Path:
         return self.dir / "audio.wav"
 
+    def drop_source(self) -> None:
+        """Borra el archivo original: la transcripción ya no lo necesita y ocupa casi todo el disco."""
+        self.source.unlink(missing_ok=True)
+
     def update(self, force: bool = False, **fields) -> None:
         self.data.update(fields)
         now = time.time()
@@ -78,6 +82,7 @@ class Job:
     def public(self) -> dict:
         d = dict(self.data)
         d.pop("owner", None)
+        d["has_media"] = self.source.exists()
         d["segment_count"] = len(self.segments)
         return d
 
@@ -106,7 +111,9 @@ class JobManager:
                 except ValueError:
                     pass
             job = Job(data, segs)
-            if data["status"] not in FINAL:
+            if data["status"] in FINAL:
+                job.drop_source()
+            else:
                 job.update(force=True, status="queued", stage="En cola (reanudado tras reinicio)", progress=0)
                 pending.append(job)
             self.jobs[job.id] = job
@@ -217,6 +224,8 @@ class JobManager:
             finally:
                 if job.dir.exists():
                     job.wav.unlink(missing_ok=True)
+                    if job.data["status"] in FINAL:
+                        job.drop_source()
 
     def _run(self, job: Job) -> None:
         is_cancelled = lambda: job.cancel_requested  # noqa: E731

@@ -49,6 +49,13 @@ def meta(upload_id: str, owner: str) -> dict:
     return m
 
 
+def _fmt_size(n: int) -> str:
+    n = max(n, 0)
+    if n >= 1024**3:
+        return f"{n / 1024**3:.1f} GB".replace(".", ",")
+    return f"{n // 1024**2} MB"
+
+
 def _purge_stalled() -> None:
     """Borra subidas sin avance reciente (p. ej. cortadas) para liberar su espacio."""
     limit = time.time() - config.UPLOAD_STALL_MINUTES * 60
@@ -73,8 +80,12 @@ def create(filename: str, size: int, owner: str) -> dict:
     if size > disk.free - reserve:
         _purge_stalled()
         disk = shutil.disk_usage(config.DATA_DIR)
-    if size > disk.free - reserve:
-        raise UploadError(507, "No hay espacio suficiente en el servidor para este archivo")
+    available = disk.free - reserve
+    if size > available:
+        raise UploadError(507, (
+            f"No hay espacio en el servidor: ahora caben archivos de hasta {_fmt_size(available)}. "
+            "Se libera al terminar las transcripciones en curso; también puedes eliminar alguna de la lista."
+        ))
 
     upload_id = uuid.uuid4().hex
     d = config.UPLOADS_DIR / upload_id

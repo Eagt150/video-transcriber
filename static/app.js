@@ -547,12 +547,17 @@ function renderActions(job) {
 
 function renderPlayer(job) {
   const wrap = $("playerWrap");
+  if (job.has_media === false) {
+    wrap.replaceChildren(el("p", { className: "muted note", textContent:
+      "El archivo original se borra al terminar para dejar espacio libre. La transcripción y las descargas siguen disponibles." }));
+    return;
+  }
   const isVideo = VIDEO_EXT.test(job.filename);
   const media = el(isVideo ? "video" : "audio", { controls: true, preload: "metadata", src: `/api/jobs/${job.id}/media` });
   media.playsInline = true;
   media.onerror = () => {
     wrap.replaceChildren(el("p", { className: "muted note", textContent:
-      "El navegador no puede reproducir este formato, pero la transcripción funciona igual." }));
+      "No se puede reproducir el archivo (formato no compatible o ya se borró al terminar), pero la transcripción funciona igual." }));
   };
   media.ontimeupdate = () => highlightCurrent(media.currentTime);
   wrap.replaceChildren(media);
