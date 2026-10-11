@@ -14,6 +14,7 @@ conexión se corta, el navegador pregunta cuántos bytes llegaron y continúa.
 import json
 import re
 import shutil
+import time
 import uuid
 from pathlib import Path
 
@@ -48,6 +49,17 @@ def meta(upload_id: str, owner: str) -> dict:
     return m
 
 
+def _purge_stalled(max_idle: float = 30 * 60) -> None:
+    """Borra subidas sin avance reciente (p. ej. cortadas) para liberar su espacio."""
+    limit = time.time() - max_idle
+    for d in config.UPLOADS_DIR.iterdir():
+        try:
+            if (d / "data").stat().st_mtime < limit:
+                shutil.rmtree(d, ignore_errors=True)
+        except OSError:
+            pass
+
+
 def create(filename: str, size: int, owner: str) -> dict:
     filename = Path(filename).name.strip() or "archivo"
     if size <= 0:
@@ -58,6 +70,9 @@ def create(filename: str, size: int, owner: str) -> dict:
     # como máximo DISK_RESERVE_MB (en un volumen pequeño un margen fijo lo bloquearía todo).
     disk = shutil.disk_usage(config.DATA_DIR)
     reserve = min(config.DISK_RESERVE_BYTES, disk.total // 10)
+    if size > disk.free - reserve:
+        _purge_stalled()
+        disk = shutil.disk_usage(config.DATA_DIR)
     if size > disk.free - reserve:
         raise UploadError(507, "No hay espacio suficiente en el servidor para este archivo")
 
