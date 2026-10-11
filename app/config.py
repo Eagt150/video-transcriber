@@ -57,6 +57,8 @@ CHUNK_SIZE = _int("CHUNK_SIZE_MB", 32) * 1024 * 1024
 MAX_UPLOAD_BYTES = _int("MAX_UPLOAD_GB", 0) * 1024**3  # 0 = sin límite
 # Espacio libre que se guarda para el audio extraído (~115 MB por hora de audio).
 DISK_RESERVE_BYTES = _int("DISK_RESERVE_MB", 256) * 1024**2
+# Si falta espacio, se borran las subidas que lleven estos minutos sin recibir datos.
+UPLOAD_STALL_MINUTES = _int("UPLOAD_STALL_MINUTES", 30)
 
 # Limpieza automática de trabajos y subidas abandonadas.
 RETENTION_HOURS = _int("RETENTION_HOURS", 72)

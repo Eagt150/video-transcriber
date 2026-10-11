@@ -49,9 +49,9 @@ def meta(upload_id: str, owner: str) -> dict:
     return m
 
 
-def _purge_stalled(max_idle: float = 30 * 60) -> None:
+def _purge_stalled() -> None:
     """Borra subidas sin avance reciente (p. ej. cortadas) para liberar su espacio."""
-    limit = time.time() - max_idle
+    limit = time.time() - config.UPLOAD_STALL_MINUTES * 60
     for d in config.UPLOADS_DIR.iterdir():
         try:
             if (d / "data").stat().st_mtime < limit:
