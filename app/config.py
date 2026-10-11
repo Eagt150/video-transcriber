@@ -2,6 +2,7 @@
 
 import os
 import secrets
+import shutil
 from pathlib import Path
 
 
@@ -65,3 +66,7 @@ SESSION_SECRET = os.environ.get("SESSION_SECRET") or secrets.token_hex(32)
 
 for d in (UPLOADS_DIR, JOBS_DIR, MODELS_DIR):
     d.mkdir(parents=True, exist_ok=True)
+
+# Si los modelos viven fuera de DATA_DIR, se borran copias viejas que ocupen el volumen.
+if MODELS_DIR != DATA_DIR / "models" and (DATA_DIR / "models").is_dir():
+    shutil.rmtree(DATA_DIR / "models", ignore_errors=True)
