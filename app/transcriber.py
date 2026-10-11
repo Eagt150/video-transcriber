@@ -141,7 +141,7 @@ def get_model(name: str) -> WhisperModel:
     with _model_lock:
         if _model is None or _model_name != name:
             _model = None  # libera el anterior antes de cargar el nuevo
-            log.info("Cargando modelo %s (%s, %s)", name, config.DEVICE, config.COMPUTE_TYPE)
+            log.info("Cargando modelo %s (%s, %s, %d hilos)", name, config.DEVICE, config.COMPUTE_TYPE, config.CPU_THREADS)
             _model = WhisperModel(
                 name,
                 device=config.DEVICE,

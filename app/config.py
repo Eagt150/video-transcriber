@@ -12,6 +12,18 @@ def _int(name: str, default: int) -> int:
         return default
 
 
+def _available_cpus() -> int:
+    """Núcleos realmente asignados al contenedor (cgroup), no los de la máquina física."""
+    count = len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else (os.cpu_count() or 4)
+    try:
+        quota, period = Path("/sys/fs/cgroup/cpu.max").read_text().split()
+        if quota != "max":
+            count = min(count, max(1, int(int(quota) / int(period))))
+    except (OSError, ValueError):
+        pass
+    return count
+
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = Path(os.environ.get("DATA_DIR", BASE_DIR / "data")).resolve()
 UPLOADS_DIR = DATA_DIR / "uploads"
@@ -32,7 +44,7 @@ if DEFAULT_MODEL not in ALLOWED_MODELS:
 # CPU: int8 es el tipo más rápido y con menos RAM. En GPU usar "float16".
 DEVICE = os.environ.get("WHISPER_DEVICE", "cpu")
 COMPUTE_TYPE = os.environ.get("WHISPER_COMPUTE_TYPE", "int8")
-CPU_THREADS = _int("CPU_THREADS", os.cpu_count() or 4)
+CPU_THREADS = _int("CPU_THREADS", _available_cpus())
 BEAM_SIZE = _int("BEAM_SIZE", 5)
 
 # El audio se transcribe por ventanas para que la RAM no crezca con la duración.
