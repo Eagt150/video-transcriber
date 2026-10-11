@@ -32,6 +32,10 @@ def _write_json(path: Path, data) -> None:
         tmp.replace(path)
     except FileNotFoundError:
         pass
+    except OSError:
+        # Con el disco lleno no se puede guardar, pero el estado sigue en memoria y el
+        # hilo de transcripción no debe morir (si muere, ningún trabajo más se procesa).
+        log.exception("No se pudo guardar %s", path)
 
 
 class Job:
