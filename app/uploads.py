@@ -55,9 +55,9 @@ def create(filename: str, size: int, owner: str) -> dict:
     if config.MAX_UPLOAD_BYTES and size > config.MAX_UPLOAD_BYTES:
         raise UploadError(413, f"El archivo supera el máximo de {config.MAX_UPLOAD_BYTES // 1024**3} GB")
     # Se deja margen para el audio extraído y los demás archivos: 10 % del disco,
-    # como máximo 512 MB (en un volumen pequeño un margen fijo lo bloquearía todo).
+    # como máximo DISK_RESERVE_MB (en un volumen pequeño un margen fijo lo bloquearía todo).
     disk = shutil.disk_usage(config.DATA_DIR)
-    reserve = min(512 * 1024**2, disk.total // 10)
+    reserve = min(config.DISK_RESERVE_BYTES, disk.total // 10)
     if size > disk.free - reserve:
         raise UploadError(507, "No hay espacio suficiente en el servidor para este archivo")
 
